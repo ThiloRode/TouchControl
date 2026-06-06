@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtuelle Umgebung
+.venv/
+
+# Konfiguration pro Geraet (wird zur Laufzeit erzeugt)
+config.json
+
+# OS
+.DS_Store

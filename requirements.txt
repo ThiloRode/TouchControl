@@ -1,0 +1,5 @@
+# TouchHUI - Mackie Control touchscreen controller
+# Works on macOS (development) and Raspberry Pi / Linux (deployment).
+
+kivy>=2.3.0
+python-rtmidi>=1.5.8

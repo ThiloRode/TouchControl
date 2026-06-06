@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "touchhui"
+name = "touchcontrol"
 version = "0.1.0"
 description = "Touchscreen Mackie Control (MCU) controller for Raspberry Pi"
 requires-python = ">=3.9"
@@ -20,7 +20,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 # Tests liegen in tests/, unser Code in src/ - daher src auf den Importpfad legen,
-# damit Tests "import touchhui..." nutzen koennen, ohne das Paket installieren zu muessen.
+# damit Tests "import touchcontrol..." nutzen koennen, ohne das Paket installieren zu muessen.
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-v"

@@ -22,7 +22,7 @@ Kein Master-Fader. Mehrere DAWs: Start mit **Cubase** und **Ableton** (+ Generic
 | DAW-Profil | `DawProfile` (+ `Generic`/`Cubase`/`Ableton`) | nur DAW-Eigenheiten (Meter-Skalierung, LCD-Aufteilung, Pan-Anzeige) |
 | Model | `ChannelState`, `MixerState` | Kanal-/Mixer-Zustand, Observer-Benachrichtigung |
 | UI | `ChannelStripWidget`, `MixerView`, Screens | Touch-Oberfläche (Kivy) |
-| Glue | `SurfaceController`, `AppController`, `TouchHUIApp` | verbindet alle Schichten |
+| Glue | `SurfaceController`, `AppController`, `TouchControlApp` | verbindet alle Schichten |
 
 ## Datenfluss
 

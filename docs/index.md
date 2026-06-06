@@ -1,4 +1,4 @@
-# TouchHUI – Dokumentation
+# TouchControl – Dokumentation
 
 Touchscreen-**Mackie-Control-(MCU)**-Controller. Entwicklung auf dem Mac,
 Betrieb auf einem Raspberry Pi 4 mit 10,1"-Touchscreen (1280×800).
@@ -9,7 +9,7 @@ Betrieb auf einem Raspberry Pi 4 mit 10,1"-Touchscreen (1280×800).
 
 ## Module (wird mit jedem Schritt ergänzt)
 
-Noch keine – wir beginnen mit `MidiBackend`.
+- [`MidiBackend`](midi-backend.md) – MIDI-Transportschicht (Ports, Senden, Empfang über Queue).
 
 ## Arbeitsweise
 

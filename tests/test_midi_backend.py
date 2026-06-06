@@ -8,14 +8,17 @@ DAW pruefen, dass Bytes wirklich ankommen.
 
 from __future__ import annotations
 
+import os
 import time
 
 import pytest
 
 from touchcontrol.midi import MidiBackend
 
-# Eindeutiger Portname, damit Tests sich nicht mit echten Geraeten verwechseln.
-PORT_NAME = "TouchControl PyTest"
+# Eindeutiger Portname je Prozess: enthaelt die PID, damit parallele oder
+# uebrig gebliebene Testlaeufe nicht denselben virtuellen Port erzeugen. Genau
+# solche Namenskollisionen fuehren sonst zu spurious Fehlern oder CoreMIDI-Haengern.
+PORT_NAME = f"TouchControl PyTest {os.getpid()}"
 
 
 def warte_auf_nachricht(backend: MidiBackend, timeout: float = 2.0):

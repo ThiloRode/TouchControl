@@ -1,86 +1,57 @@
-"""``ChannelStripWidget`` - ein einzelner Kanalzug in der Kivy-Oberflaeche.
+"""``ChannelStripWidget`` - ein einzelner Kanalzug im modernen Design.
 
-Zeigt alle Informationen eines Kanals:
+Verbindet die optisch aufwendigen Controls aus :mod:`touchcontrol.ui.controls`
+(:class:`ModernFader`, :class:`ModernPanner`, :class:`ChannelToggleButton`) mit
+der bestehenden bidirektionalen MIDI-Anbindung:
 
-* **Kanalname** (oben, kommt spaeter per LCD-SysEx von der DAW)
-* **Meter** (VU-Balken, Platzhalter bis MeterEvent implementiert ist)
-* **Fader** (vertikaler Slider, bidirektional: DAW <-> UI)
-* **Taster** REC / SOLO / MUTE / SELECT (Zustand kommt von der DAW)
+* **Kanalname** (oben, kommt per LCD-SysEx von der DAW)
+* **Panner** (V-Pot, relative MCU-Schritte)
+* **Fader** mit integriertem Pegelmeter (Pitch-Bend, dB-Skala)
+* **Taster** M / S / R / SEL (feedback-gesteuert)
 
 Das Widget registriert sich als Observer auf dem uebergebenen
-:class:`~touchcontrol.model.ChannelState`. Wenn die DAW den Fader bewegt,
-aktualisiert sich der Slider automatisch. Umgekehrt sendet der Slider
-bei Benutzereingabe sofort eine MCU-Pitch-Bend-Nachricht.
-
-Die Threading-Sicherheit ergibt sich aus der Architektur: Der
-:class:`~touchcontrol.midi.MidiBackend` legt eingehende Bytes in eine
-Queue, und das Demo-Script leert diese Queue im Kivy-Hauptthread
-(``Clock.schedule_interval``). Deshalb werden die Observer-Callbacks
-immer aus dem Hauptthread gerufen - Kivy-Zugriffe sind sicher.
+:class:`~touchcontrol.model.ChannelState`. Bewegt die DAW den Fader, folgt der
+Regler automatisch; umgekehrt sendet eine Benutzergeste sofort die passende
+MCU-Nachricht. Ein Touch-Latch verhindert, dass das leicht verzoegerte
+DAW-Echo den gerade beruehrten Regler zurueckspringen laesst.
 """
 
 from __future__ import annotations
 
+from kivy.app import App
 from kivy.graphics import Color, Rectangle
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
-from kivy.uix.slider import Slider
-from kivy.uix.togglebutton import ToggleButton
-from kivy.uix.widget import Widget
 
 from touchcontrol.midi import MidiBackend
 from touchcontrol.mcu import McuEncoder
 from touchcontrol.mcu.constants import (
     MUTE_BASE,
-    READ,
     REC_BASE,
     SELECT_BASE,
     SOLO_BASE,
-    WRITE,
 )
 from touchcontrol.model import ChannelState
 
+from .controls import ChannelToggleButton, ModernFader, ModernPanner
 
-class MeterWidget(Widget):
-    """Einfacher VU-Meter-Balken.
+# Wie viele relative V-Pot-Schritte entsprechen einem vollen Pan-Weg (0.0->1.0)?
+# MCU-V-Pots sind relative Encoder; Cubase rechnet Schritte in Pan-Bewegung um.
+# Etwas ueber dem theoretischen Minimum, damit der volle Reglerweg die
+# Endanschlaege (L100/R100) sicher erreicht - Cubase begrenzt selbst.
+PAN_SWEEP_TICKS = 132
 
-    Zeigt den Pegel 0-15 als gruener Balken von unten nach oben.
-    Wird aktualisiert, sobald MeterEvents vom Decoder ankommen.
-    Bis dahin bleibt er dunkel (Pegel 0).
-    """
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._level: int = 0
-        with self.canvas:
-            # Dunkler Hintergrund.
-            Color(0.12, 0.12, 0.12, 1)
-            self._bg = Rectangle(pos=self.pos, size=self.size)
-            # Gruen-gelb-roter Pegel-Balken (zunächst hoehe 0).
-            Color(0.1, 0.75, 0.2, 1)
-            self._bar = Rectangle(pos=self.pos, size=(self.width, 0))
-        self.bind(pos=self._redraw, size=self._redraw)
-
-    def set_level(self, level: int) -> None:
-        """Pegel setzen (0-15, 0=kein Signal, 15=Clipping)."""
-        self._level = max(0, min(15, level))
-        self._redraw()
-
-    def _redraw(self, *_args) -> None:
-        self._bg.pos = self.pos
-        self._bg.size = self.size
-        bar_h = self.height * (self._level / 15) if self._level > 0 else 0
-        self._bar.pos = self.pos
-        self._bar.size = (self.width, bar_h)
+# Maximaler Pegel eines MCU-MeterEvents (0-15) -> normiert auf 0.0-1.0.
+_METER_MAX = 15.0
 
 
 class ChannelStripWidget(BoxLayout):
-    """Ein einzelner Kanalzug (160 x 800 Pixel bei 1280x800 und 8 Kanaelen).
+    """Ein einzelner Kanalzug im modernen Design.
 
     :param channel_state: Der Zustand dieses Kanals (Model).
     :param backend: MIDI-Backend fuer das Senden von Faderbewegungen.
-    :param encoder: Encoder, der Faderposition in Bytes umwandelt.
+    :param encoder: Encoder, der Reglerwerte in Bytes umwandelt.
     """
 
     def __init__(
@@ -90,14 +61,20 @@ class ChannelStripWidget(BoxLayout):
         encoder: McuEncoder,
         **kwargs,
     ) -> None:
-        super().__init__(orientation="vertical", spacing=0, padding=2, **kwargs)
+        super().__init__(orientation="vertical", spacing=10, padding=4, **kwargs)
 
         self._state = channel_state
         self._backend = backend
         self._encoder = encoder
 
-        # Guard: verhindert Rueckkopplung DAW -> Slider -> Senden -> DAW -> ...
+        # Guard: verhindert Rueckkopplung DAW -> Regler -> Senden -> DAW -> ...
         self._updating_from_daw = False
+
+        # Letzter bekannter Pan-Wert (0.0-1.0) fuer relative V-Pot-Schritte.
+        self._pan_value = 0.5
+        # Bruchteil-Akkumulator: sammelt nicht ganzzahlige Schrittanteile, damit
+        # auch langsame Bewegungen nicht durch Rundung auf 0 verloren gehen.
+        self._pan_tick_accum = 0.0
 
         self._build_ui()
 
@@ -111,133 +88,152 @@ class ChannelStripWidget(BoxLayout):
     def _build_ui(self) -> None:
         ch = self._state.channel
 
-        # Hintergrund leicht alternierend fuer bessere Trennung der Kanaele.
-        bg = 0.18 if ch % 2 == 0 else 0.22
+        # Hintergrund des Kanalschachts (Theme-Widget-Hintergrund).
         with self.canvas.before:
-            Color(bg, bg, bg, 1)
+            self._bg_color = Color(0.08, 0.08, 0.11, 1)
             self._bg_rect = Rectangle(pos=self.pos, size=self.size)
         self.bind(pos=self._update_bg, size=self._update_bg)
 
-        # --- Kanalname (oben) ---
+        # Auf Theme-Wechsel reagieren (App liefert widget_bg_color).
+        app = App.get_running_app()
+        if app is not None and hasattr(app, "widget_bg_color"):
+            app.bind(widget_bg_color=self._apply_bg_color)
+            self._apply_bg_color(app, app.widget_bg_color)
+
+        # --- Kanalname (oben, theme-reaktiv) ---
+        accent = list(app.accent_color) if app is not None and hasattr(app, "accent_color") else [0.0, 0.67, 1.0, 1.0]
         self._name_label = Label(
             text=f"CH {ch + 1}",
             size_hint=(1, None),
-            height=40,
-            font_size=13,
+            height=88,
+            font_size=36,
             bold=True,
-            color=(0.9, 0.9, 0.9, 1),
+            color=accent,
         )
+        if app is not None and hasattr(app, "accent_color"):
+            app.bind(accent_color=lambda _i, c: setattr(self._name_label, "color", c))
         self.add_widget(self._name_label)
 
-        # --- Pan (V-Pot) als horizontaler Slider ---
-        self._pan = Slider(
-            min=0.0, max=1.0, value=0.5,
-            orientation="horizontal",
-            size_hint=(1, None), height=30,
-        )
-        # Letzter bekannter Pan-Wert (fuer relative V-Pot-Schritte).
-        self._pan_value = 0.5
-        self._pan.bind(value=self._on_pan_value)
-        self.add_widget(self._pan)
+        # --- Panner (V-Pot) ---
+        self._panner = ModernPanner(size_hint=(1, None), height=160)
+        self._panner.bind(pan_value=self._on_pan_value)
+        self.add_widget(self._panner)
 
-        # --- VU-Meter ---
-        self._meter = MeterWidget(size_hint=(1, None), height=70)
-        self.add_widget(self._meter)
+        # --- Fader mit integriertem Pegelmeter ---
+        self._fader = ModernFader(size_hint=(1, 1))
+        self._fader.bind(value=self._on_fader_value)
+        self.add_widget(self._fader)
 
-        # --- Vertikaler Fader ---
-        self._slider = Slider(
-            min=0.0,
-            max=1.0,
-            value=0.0,
-            orientation="vertical",
-            size_hint=(1, 1),
-        )
-        self._slider.bind(value=self._on_slider_value)
-        self.add_widget(self._slider)
-
-        # --- Taster REC / SOLO / MUTE / SELECT / READ / WRITE (2x3) ---
+        # --- Taster M / S / R / SEL (2x2) ---
+        # Die Grid-Hoehe wird reaktiv aus der tatsaechlichen Breite berechnet,
+        # damit die Zellen unabhaengig von der Kanalbreite immer quadratisch
+        # bleiben (siehe _square_button_grid).
         btn_grid = GridLayout(
             cols=2,
+            rows=2,
             size_hint=(1, None),
-            height=126,
-            spacing=2,
-            padding=[2, 2],
+            spacing=6,
+            padding=[10, 0, 10, 8],
         )
-        self._btn_rec = ToggleButton(
-            text="REC", font_size=11,
-            background_color=(0.65, 0.15, 0.15, 1),
-        )
-        self._btn_solo = ToggleButton(
-            text="SOLO", font_size=11,
-            background_color=(0.65, 0.55, 0.05, 1),
-        )
-        self._btn_mute = ToggleButton(
-            text="MUTE", font_size=11,
-            background_color=(0.45, 0.45, 0.05, 1),
-        )
-        self._btn_select = ToggleButton(
-            text="SEL", font_size=11,
-            background_color=(0.1, 0.35, 0.65, 1),
-        )
-        self._btn_read = ToggleButton(
-            text="READ", font_size=11,
-            background_color=(0.15, 0.55, 0.25, 1),
-        )
-        self._btn_write = ToggleButton(
-            text="WRITE", font_size=11,
-            background_color=(0.6, 0.2, 0.2, 1),
-        )
+        btn_grid.bind(width=self._square_button_grid)
+        self._btn_mute = ChannelToggleButton(text="M", font_size=22)
+        self._btn_solo = ChannelToggleButton(text="S", font_size=22)
+        self._btn_rec = ChannelToggleButton(text="R", font_size=22)
+        self._btn_select = ChannelToggleButton(text="SEL", font_size=18)
         # Taster sind feedback-gesteuert: Druck sendet nur, der LED-Zustand
         # kommt von der DAW zurueck (siehe _on_button_press).
-        self._btn_rec.bind(on_press=lambda *_a: self._on_button_press(REC_BASE))
-        self._btn_solo.bind(on_press=lambda *_a: self._on_button_press(SOLO_BASE))
         self._btn_mute.bind(on_press=lambda *_a: self._on_button_press(MUTE_BASE))
+        self._btn_solo.bind(on_press=lambda *_a: self._on_button_press(SOLO_BASE))
+        self._btn_rec.bind(on_press=lambda *_a: self._on_button_press(REC_BASE))
         self._btn_select.bind(on_press=lambda *_a: self._on_button_press(SELECT_BASE))
-        self._btn_read.bind(on_press=lambda *_a: self._on_automation_press(READ))
-        self._btn_write.bind(on_press=lambda *_a: self._on_automation_press(WRITE))
-        btn_grid.add_widget(self._btn_rec)
-        btn_grid.add_widget(self._btn_solo)
         btn_grid.add_widget(self._btn_mute)
+        btn_grid.add_widget(self._btn_solo)
+        btn_grid.add_widget(self._btn_rec)
         btn_grid.add_widget(self._btn_select)
-        btn_grid.add_widget(self._btn_read)
-        btn_grid.add_widget(self._btn_write)
         self.add_widget(btn_grid)
 
+    def _square_button_grid(self, grid, width: float) -> None:
+        """Grid-Hoehe so setzen, dass jede Zelle das Verhaeltnis 2:3 (H:B) hat.
+
+        Zellbreite = (Breite - horizontales Padding - Spalten-Spacing) / 2,
+        Zellhoehe  = Zellbreite * 2/3 (flachere Taster). Die Gesamthoehe ergibt
+        sich aus zwei Zeilen plus Zeilen-Spacing und oberem/unterem Padding.
+        """
+        pad_l, pad_t, pad_r, pad_b = grid.padding
+        spacing_x, spacing_y = grid.spacing
+        cell_w = max(0.0, (width - pad_l - pad_r - spacing_x) / 2.0)
+        cell_h = cell_w * 2.0 / 3.0
+        grid.height = cell_h * 2 + spacing_y + pad_t + pad_b
+
     # ------------------------------------------------------------------
-    # Callbacks
-    # ------------------------------------------------------------------
+    # Hintergrund / Theme
 
     def _update_bg(self, *_args) -> None:
         self._bg_rect.pos = self.pos
         self._bg_rect.size = self.size
 
-    def _on_slider_value(self, _instance, value: float) -> None:
-        """Benutzer hat den Fader gezogen -> MCU-MIDI senden."""
+    def _apply_bg_color(self, _app, rgba) -> None:
+        self._bg_color.rgba = rgba
+
+    # ------------------------------------------------------------------
+    # Fader-Callbacks
+    # ------------------------------------------------------------------
+
+    def _on_fader_value(self, _instance, value: float) -> None:
+        """Benutzer hat den Fader gezogen -> MCU-Pitch-Bend senden."""
         if not self._updating_from_daw:
+            # Modell mit der UI synchron halten (sonst setzt ein spaeteres
+            # State-Update wegen eines anderen Feldes den Fader zurueck).
+            self._state.fader_position = value
             msg = self._encoder.fader_position(self._state.channel, value)
             self._backend.send(msg)
 
-    def _on_pan_value(self, _instance, value: float) -> None:
-        """Benutzer hat den Pan-Regler bewegt -> relative V-Pot-Schritte senden.
+    # ------------------------------------------------------------------
+    # Pan-Callbacks (relative V-Pot-Schritte)
+    # ------------------------------------------------------------------
 
-        MCU-V-Pots sind relativ: Wir senden die Differenz seit der letzten
-        Position als Anzahl Schritte (im/gegen den Uhrzeigersinn).
+    def _on_pan_value(self, _instance, pan_value: float) -> None:
+        """Benutzer hat den Panner bewegt -> relative V-Pot-Schritte senden.
+
+        Der Panner liefert ``-1.0 .. +1.0``; das Modell speichert ``0.0 .. 1.0``.
         """
         if self._updating_from_daw:
             return
-        ticks = round((value - self._pan_value) * 16)
-        self._pan_value = value
+        value01 = (pan_value + 1.0) / 2.0
+        # Bewegung seit dem letzten Event in (Bruchteil-)Schritte umrechnen und
+        # akkumulieren, damit auch viele kleine Bewegungen korrekt aufsummieren.
+        self._pan_tick_accum += (value01 - self._pan_value) * PAN_SWEEP_TICKS
+        self._pan_value = value01
+        # Modell synchron halten.
+        self._state.pan = value01
+        ticks = int(self._pan_tick_accum)  # schneidet Richtung 0 ab
         if ticks != 0:
-            self._backend.send(self._encoder.vpot_rotate(self._state.channel, ticks))
+            self._pan_tick_accum -= ticks
+            self._send_vpot_ticks(ticks)
+
+    def _send_vpot_ticks(self, ticks: int) -> None:
+        """V-Pot-Schritte senden, bei Bedarf in 6-bit-Haeppchen aufgeteilt.
+
+        Eine einzelne V-Pot-Nachricht kann nur bis zu 0x3F (63) Schritte
+        tragen. Groessere Bewegungen werden auf mehrere Nachrichten verteilt.
+        """
+        channel = self._state.channel
+        schritt = 0x3F if ticks > 0 else -0x3F
+        rest = ticks
+        while abs(rest) > 0x3F:
+            self._backend.send(self._encoder.vpot_rotate(channel, schritt))
+            rest -= schritt
+        if rest != 0:
+            self._backend.send(self._encoder.vpot_rotate(channel, rest))
+
+    # ------------------------------------------------------------------
+    # Taster
+    # ------------------------------------------------------------------
 
     def _send_bang(self, note: int) -> None:
         """Note-Bang (Press + Release) ueber das Backend senden."""
         for msg in self._encoder.button_bang(note):
             self._backend.send(msg)
-
-    def _restore_button_states(self) -> None:
-        """Taster-Optik wieder am Modell ausrichten (Feedback steuert die LED)."""
-        self._sync_buttons_from_state()
 
     def _on_button_press(self, base_note: int) -> None:
         """Pro-Kanal-Taster gedrueckt -> Note-Bang fuer diesen Kanal senden."""
@@ -245,44 +241,41 @@ class ChannelStripWidget(BoxLayout):
             return
         self._send_bang(base_note + self._state.channel)
         # Lokales Toggle rueckgaengig machen - die DAW liefert den echten Zustand.
-        self._restore_button_states()
-
-    def _on_automation_press(self, note: int) -> None:
-        """Read/Write gedrueckt -> erst diesen Kanal selektieren, dann togglen.
-
-        Read/Write sind im MCU globale Tasten und wirken auf den selektierten
-        Kanal. Damit der Strip-Button "seinen" Kanal betrifft, selektieren wir
-        ihn zuerst.
-        """
-        if self._updating_from_daw:
-            return
-        self._send_bang(SELECT_BASE + self._state.channel)
-        self._send_bang(note)
-        self._restore_button_states()
+        self._sync_buttons_from_state()
 
     def _sync_buttons_from_state(self) -> None:
         """Alle Taster-LEDs aus dem aktuellen ChannelState setzen."""
         s = self._state
-        self._btn_rec.state = "down" if s.rec else "normal"
-        self._btn_solo.state = "down" if s.solo else "normal"
-        self._btn_mute.state = "down" if s.mute else "normal"
-        self._btn_select.state = "down" if s.select else "normal"
-        self._btn_read.state = "down" if s.read else "normal"
-        self._btn_write.state = "down" if s.write else "normal"
+        self._btn_rec.active = s.rec
+        self._btn_solo.active = s.solo
+        self._btn_mute.active = s.mute
+        self._btn_select.active = s.select
+
+    # ------------------------------------------------------------------
+    # Observer-Callback
+    # ------------------------------------------------------------------
 
     def _on_state_changed(self, state: ChannelState) -> None:
-        """Observer-Callback: ChannelState hat sich geaendert -> UI aktualisieren.
+        """ChannelState hat sich geaendert -> UI aktualisieren.
 
         Wird immer aus dem Kivy-Hauptthread aufgerufen (via Clock), deshalb
         sind alle Kivy-Operationen hier sicher.
         """
         self._updating_from_daw = True
         try:
-            self._slider.value = state.fader_position
-            self._pan.value = state.pan
-            self._pan_value = state.pan
-            self._name_label.text = state.name if state.name else f"CH {state.channel + 1}"
-            self._meter.set_level(state.meter_level)
+            # Fader/Pan nur nachfuehren, wenn der Benutzer sie gerade NICHT
+            # haelt (Touch-Latch verhindert Zittern/Springen durch DAW-Echo).
+            if not self._fader.touch_active:
+                self._fader.value = state.fader_position
+            if not self._panner.touch_active:
+                self._panner.pan_value = state.pan * 2.0 - 1.0
+                self._pan_value = state.pan
+            self._name_label.text = (
+                state.name if state.name else f"CH {state.channel + 1}"
+            )
+            self._fader.meter_frac = max(
+                0.0, min(1.0, state.meter_level / _METER_MAX)
+            )
             self._sync_buttons_from_state()
         finally:
             self._updating_from_daw = False

@@ -1,0 +1,353 @@
+# --- Kivy Layout & Styling Definition für Mixer Lab ---
+# Diese Datei definiert die Baumstruktur der Benutzeroberfläche, reaktive Bindungen
+# sowie Vektorgrafiken (Canvas Anweisungen) für die einzelnen Audio-Komponenten.
+
+<MixerDashboard>:
+    # Hintergrund für das gesamte Anwendungsfenster
+    canvas.before:
+        Color:
+            rgba: app.bg_color
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    # ==================== LINKES INFO-PANEL ====================
+    BoxLayout:
+        orientation: 'vertical'
+        size_hint: None, None
+        size: 230, 600
+        pos: 40, 225
+        spacing: 20
+        padding: 20
+        canvas.before:
+            # Hintergrundkarte mit abgerundeten Ecken passend zum Theme
+            Color:
+                rgba: app.widget_bg_color
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [12,]
+
+        Label:
+            text: "MIXER LAB"
+            font_size: '20sp'
+            bold: True
+            color: app.accent_color
+            size_hint_y: None
+            height: 40
+
+        Label:
+            text: "Kurzanleitung:"
+            font_size: '14sp'
+            bold: True
+            color: 1, 1, 1, 0.9
+            size_hint_y: None
+            height: 20
+            halign: 'left'
+            valign: 'middle'
+            text_size: self.size
+
+        Label:
+            text: "• Panner:\n  Vertikal ziehen zum Regeln.\n  Doppelklick setzt auf C (Center).\n\n• Fader:\n  Vertikal ziehen zum Regeln.\n  Doppelklick setzt auf 0.0 dB.\n\n• Mute / Solo / Rec / Sel:\n  Praktische Toggle-Buttons unten."
+            font_size: '13sp'
+            color: 0.8, 0.8, 0.8, 1
+            valign: 'top'
+            halign: 'left'
+            text_size: self.size
+
+    # ==================== MITTLERER KANALZUG ====================
+    MixerChannelStrip:
+        id: channel_strip
+        size_hint: None, None
+        size: 200, 1000
+        pos: 300, 25
+
+    # ==================== RECHTES SETTINGS-PANEL ====================
+    BoxLayout:
+        orientation: 'vertical'
+        size_hint: None, None
+        size: 230, 600
+        pos: 530, 225
+        spacing: 15
+        padding: 20
+        canvas.before:
+            # Panel-Hintergrundkarte mit Eckenradius
+            Color:
+                rgba: app.widget_bg_color
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [12,]
+
+        Label:
+            text: "EINSTELLUNGEN"
+            font_size: '18sp'
+            bold: True
+            color: app.accent_color
+            size_hint_y: None
+            height: 30
+
+        # Sektion A: DAW Profilauswahl (ändert die Interpolations-Tick-Stützpunkte)
+        Label:
+            text: "DAW Skalierung"
+            font_size: '14sp'
+            bold: True
+            color: 1, 1, 1, 0.9
+            size_hint_y: None
+            height: 20
+            halign: 'left'
+            valign: 'middle'
+            text_size: self.size
+
+        BoxLayout:
+            orientation: 'vertical'
+            spacing: 8
+            size_hint_y: None
+            height: 80
+
+            Button:
+                text: "Logic Pro X"
+                bold: True
+                background_normal: ''
+                # Farblicher Indikator, ob dieses Profil aktiv ist
+                background_color: app.accent_color if channel_strip.fader_daw == 'LogicPro' else [0.15, 0.15, 0.15, 1.0]
+                color: [1, 1, 1, 1] if channel_strip.fader_daw == 'LogicPro' else [0.7, 0.7, 0.7, 1.0]
+                on_release: channel_strip.fader_daw = 'LogicPro'
+
+            Button:
+                text: "Alternative DAW"
+                bold: True
+                background_normal: ''
+                # Farblicher Indikator, ob dieses Profil aktiv ist
+                background_color: app.accent_color if channel_strip.fader_daw == 'AlternativeDAW' else [0.15, 0.15, 0.15, 1.0]
+                color: [1, 1, 1, 1] if channel_strip.fader_daw == 'AlternativeDAW' else [0.7, 0.7, 0.7, 1.0]
+                on_release: channel_strip.fader_daw = 'AlternativeDAW'
+
+        # Sektion B: Dark Mode Themes (ändert global die Farbproperties)
+        Label:
+            text: "Dark Mode Themes"
+            font_size: '14sp'
+            bold: True
+            color: 1, 1, 1, 0.9
+            size_hint_y: None
+            height: 20
+            halign: 'left'
+            valign: 'middle'
+            text_size: self.size
+
+        BoxLayout:
+            orientation: 'vertical'
+            spacing: 8
+            size_hint_y: None
+            height: 180
+
+            Button:
+                text: "Neon Ocean (Blue/Purple)"
+                font_size: '12sp'
+                bold: True
+                background_normal: ''
+                background_color: [0.0, 0.67, 1.0, 0.2] if app.current_theme_name == 'neon_ocean' else [0.15, 0.15, 0.15, 1.0]
+                color: app.accent_color if app.current_theme_name == 'neon_ocean' else [0.7, 0.7, 0.7, 1.0]
+                on_release: app.set_theme('neon_ocean')
+
+            Button:
+                text: "Cyberpunk (Pink/Orange)"
+                font_size: '12sp'
+                bold: True
+                background_normal: ''
+                background_color: [1.0, 0.0, 0.5, 0.2] if app.current_theme_name == 'cyberpunk' else [0.15, 0.15, 0.15, 1.0]
+                color: app.accent_color if app.current_theme_name == 'cyberpunk' else [0.7, 0.7, 0.7, 1.0]
+                on_release: app.set_theme('cyberpunk')
+
+            Button:
+                text: "Forest Emerald (Green/Gold)"
+                font_size: '12sp'
+                bold: True
+                background_normal: ''
+                background_color: [0.0, 0.9, 0.46, 0.2] if app.current_theme_name == 'forest_emerald' else [0.15, 0.15, 0.15, 1.0]
+                color: app.accent_color if app.current_theme_name == 'forest_emerald' else [0.7, 0.7, 0.7, 1.0]
+                on_release: app.set_theme('forest_emerald')
+
+            Button:
+                text: "Obsidian Slate (White/Gray)"
+                font_size: '12sp'
+                bold: True
+                background_normal: ''
+                background_color: [0.9, 0.9, 0.9, 0.2] if app.current_theme_name == 'obsidian' else [0.15, 0.15, 0.15, 1.0]
+                color: app.accent_color if app.current_theme_name == 'obsidian' else [0.7, 0.7, 0.7, 1.0]
+                on_release: app.set_theme('obsidian')
+
+
+<ModernFader>:
+    # Der Schieberegler mit offener Kappe und Digitalanzeige
+    canvas:
+        # Parameter für die Kappenabmessungen
+        #:set cap_w 65    # Halbe Breite
+        #:set cap_h 25    # Höhe (Kappe flacher gestaltet)
+
+        # 1. Schieber-Klammer: Ein nach rechts gekipptes U (links geschlossen, rechts offen)
+        Color:
+            rgba: app.accent_color
+        Line:
+            points: 
+                [self.center_x + cap_w, self.cap_y + cap_h, 
+                self.center_x - cap_w, self.cap_y + cap_h, 
+                self.center_x - cap_w, self.cap_y - cap_h, 
+                self.center_x + cap_w, self.cap_y - cap_h]
+            width: 5
+            cap: 'round'
+            joint: 'round'
+
+        # 2. Horizontaler, feiner Indikatorstrich in der Mitte der Klammer
+        Color:
+            rgba: 1, 1, 1, 0.9 
+        Line:
+            points: [self.center_x - cap_w + 40, self.cap_y, self.center_x + cap_w - 40, self.cap_y]
+            width: 1.0
+
+    # 3. Reaktive dB-Digitalanzeige, die mittig in der rechten Öffnung der Klammer mitschwebt
+    Label:
+        id: value_label
+        text: root.db_text
+        font_size: '13sp'
+        bold: True
+        color: app.accent_color
+        size_hint: None, None
+        size: 40, 20
+        center_y: root.cap_y
+        center_x: root.center_x + 65
+
+
+<MixerChannelStrip>:
+    # Der Kanalzug, der das Signal-Routing und die vertikale Anordnung vornimmt.
+    orientation: 'vertical'
+    spacing: 15
+    canvas:
+        # Dunkler Hintergrund für den Kanalzug-Schacht
+        Color:
+            rgba: app.widget_bg_color
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+        # --- VISUELLE SCHLITZE / MODULE-TRENNUNG ---
+        # Diese horizontalen Linien werden in der Farbe des Haupt-Hintergrunds (app.bg_color)
+        # gezeichnet, um Lücken vorzutäuschen, durch die der Hintergrund hindurchscheint.
+        
+        # A. Trennschlitz zwischen Fader und Buttons
+        Color:
+            rgba: app.bg_color
+        Line:
+            points: [self.x, self.y + 192.5, self.x + self.width, self.y + 192.5]
+            width: 8
+
+        # B. Trennschlitz zwischen Panner und Fader
+        Color:
+            rgba: app.bg_color
+        Line:
+            points: [self.x, self.y + self.height - 207.5, self.x + self.width, self.y + self.height - 207.5]
+            width: 8
+
+    # Komponente 1: Panner Dial (oben)
+    ModernPanner:
+        size_hint: 1, None
+        height: 200
+
+    # Komponente 2: Fader & Pegelmeter (Mitte, füllt den Rest)
+    ModernFader:
+        size_hint: 1, 1
+        daw_name: root.fader_daw
+
+    # Komponente 3: 2x2 Grid für Steuerungstasten (unten)
+    GridLayout:
+        cols: 2
+        rows: 2
+        size_hint: 1, None
+        height: 185
+        spacing: 8
+        padding: [15, 0, 15, 15]
+
+        # Die Tasten (M, S, R, SEL) färben sich bei Aktivierung im jeweiligen Akzent
+        ToggleButton:
+            text: 'M'
+            font_size: '14sp'
+            bold: True
+            background_normal: ''
+            background_down: ''
+            background_color: app.accent_color if self.state == 'down' else [0.15, 0.15, 0.15, 1]
+            color: [1, 1, 1, 1] if self.state == 'down' else [0.6, 0.6, 0.6, 1]
+
+        ToggleButton:
+            text: 'S'
+            font_size: '14sp'
+            bold: True
+            background_normal: ''
+            background_down: ''
+            background_color: app.accent_color if self.state == 'down' else [0.15, 0.15, 0.15, 1]
+            color: [1, 1, 1, 1] if self.state == 'down' else [0.6, 0.6, 0.6, 1]
+
+        ToggleButton:
+            text: 'R'
+            font_size: '14sp'
+            bold: True
+            background_normal: ''
+            background_down: ''
+            background_color: app.accent_color if self.state == 'down' else [0.15, 0.15, 0.15, 1]
+            color: [1, 1, 1, 1] if self.state == 'down' else [0.6, 0.6, 0.6, 1]
+
+        ToggleButton:
+            text: 'SEL'
+            font_size: '12sp'
+            bold: True
+            background_normal: ''
+            background_down: ''
+            background_color: app.accent_color if self.state == 'down' else [0.15, 0.15, 0.15, 1]
+            color: [1, 1, 1, 1] if self.state == 'down' else [0.6, 0.6, 0.6, 1]
+
+
+<ModernPanner>:
+    # Der rotierende Panorama-Regler
+    canvas:
+        # Hintergrund des Panners
+        Color:
+            rgba: app.widget_bg_color
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+        # Matrix-Anweisung starten: Rotationszentrum setzen und um 135 Grad drehen.
+        # Damit umgehen wir Kivy's Standard-Winkelnormalisierung, die negative oder
+        # start>end Winkel vertauscht und zeichnen die Lücke stabil am unteren Rand.
+        PushMatrix
+        Rotate:
+            angle: 135
+            axis: 0, 0, 1
+            origin: self.center
+
+        # A. Bogen-Silhouette: Inaktiver Pfad (mit 25% Deckkraft der Sekundärfarbe)
+        Color:
+            rgba: app.secondary_color[0], app.secondary_color[1], app.secondary_color[2], 0.25
+        Line:
+            ellipse: [self.center_x - 60, self.center_y - 60, 120, 120, 0, 270]
+            width: 5
+            cap: 'round'
+
+        # B. Aktiver Bogen: Zeigt das geregelte Signal (Akzentfarbe des Themes)
+        Color:
+            rgba: app.accent_color
+        Line:
+            ellipse: [self.center_x - 60, self.center_y - 60, 120, 120, self.active_angle_start, self.active_angle_end]
+            width: 6
+            cap: 'round'
+
+        PopMatrix
+
+    # Die Digitalanzeige der Position mittig im Panorama-Regler
+    Label:
+        text: root.pan_text
+        font_size: '15sp'
+        bold: True
+        color: app.accent_color
+        size_hint: None, None
+        size: 80, 30
+        center: root.center

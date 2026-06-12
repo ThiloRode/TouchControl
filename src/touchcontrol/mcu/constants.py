@@ -17,10 +17,6 @@ MUTE_BASE = 0x10     # MUTE:    0x10-0x17
 SELECT_BASE = 0x18   # SELECT:  0x18-0x1F
 VPOT_SWITCH_BASE = 0x20  # V-Pot-Klick: 0x20-0x27
 
-# --- Globale Automations-Taster (wirken auf den selektierten Kanal) ---
-READ = 0x4A          # Read/Off
-WRITE = 0x4B         # Write
-
 # --- V-Pot (Pan) ueber Control-Change ---
 VPOT_ROTATE_BASE = 0x10  # Controller -> DAW: Drehung, CC 0x10-0x17
 VPOT_RING_BASE = 0x30    # DAW -> Controller: LED-Ring, CC 0x30-0x37

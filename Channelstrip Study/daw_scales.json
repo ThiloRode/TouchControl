@@ -1,0 +1,22 @@
+{
+    "LogicPro": [
+        {"pos": 1.00, "width": 44, "label": "6"},
+        {"pos": 0.74, "width": 64, "label": "0"},
+        {"pos": 0.51, "width": 44, "label": "5"},
+        {"pos": 0.38, "width": 44, "label": "10"},
+        {"pos": 0.28, "width": 44, "label": "15"},
+        {"pos": 0.20, "width": 44, "label": "20"},
+        {"pos": 0.10, "width": 44, "label": "30"},
+        {"pos": 0.05, "width": 44, "label": "40"},
+        {"pos": 0.00, "width": 44, "label": "00"}
+    ],
+    "AlternativeDAW": [
+        {"pos": 1.00, "width": 44, "label": "12"},
+        {"pos": 0.80, "width": 64, "label": "0"},
+        {"pos": 0.60, "width": 44, "label": "6"},
+        {"pos": 0.40, "width": 44, "label": "12"},
+        {"pos": 0.25, "width": 44, "label": "24"},
+        {"pos": 0.12, "width": 44, "label": "48"},
+        {"pos": 0.00, "width": 44, "label": "00"}
+    ]
+}

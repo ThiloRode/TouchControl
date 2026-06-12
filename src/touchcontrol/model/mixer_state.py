@@ -24,11 +24,9 @@ from typing import Callable, List
 
 from touchcontrol.mcu.constants import (
     MUTE_BASE,
-    READ,
     REC_BASE,
     SELECT_BASE,
     SOLO_BASE,
-    WRITE,
 )
 from touchcontrol.mcu.events import (
     ButtonEvent,
@@ -70,7 +68,7 @@ class MixerState:
         self._lcd: List[str] = [" "] * 112
 
         # Welcher Kanal ist gerade selektiert? Wird aus dem Select-LED-
-        # Feedback abgeleitet. Read/Write (global) gelten fuer diesen Kanal.
+        # Feedback abgeleitet.
         self.selected_channel: int = 0
 
         # Listener, die bei einer Bank-Aenderung informiert werden.
@@ -163,8 +161,6 @@ class MixerState:
         """Taster-/LED-Event auswerten und in den passenden State schreiben.
 
         Pro-Kanal-Taster (Rec/Solo/Mute/Select) gehen direkt an ihren Kanal.
-        Die globalen Automations-LEDs (Read/Write) gelten fuer den aktuell
-        selektierten Kanal.
         """
         note = event.note
 
@@ -178,12 +174,8 @@ class MixerState:
             ch = note - SELECT_BASE
             self.channels[ch].update(select=event.pressed)
             if event.pressed:
-                # Neuer selektierter Kanal merken (fuer Read/Write).
+                # Neuer selektierter Kanal merken.
                 self.selected_channel = ch
-        elif note == READ:
-            self.channels[self.selected_channel].update(read=event.pressed)
-        elif note == WRITE:
-            self.channels[self.selected_channel].update(write=event.pressed)
         # Andere Noten (Transport, Funktionstasten) ignorieren wir hier.
 
     def _apply_meter(self, event: MeterEvent) -> None:

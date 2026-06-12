@@ -36,12 +36,14 @@ Beenden mit Fenster schliessen oder Strg+C.
 
 from kivy.app import App
 from kivy.clock import Clock
+from kivy.core.window import Window
 
 from touchcontrol.midi import MidiBackend
 from touchcontrol.mcu import McuDecoder, McuEncoder
 from touchcontrol.mcu.events import HostConnectionQueryEvent, LcdEvent
 from touchcontrol.model import MixerState
-from touchcontrol.ui import MixerView
+from touchcontrol.ui import ThemedAppMixin, build_root
+from touchcontrol.ui.theme import DEFAULT_THEME
 
 # Name des virtuellen Ports, den Cubase als MCU-Ein-/Ausgang sieht.
 PORT_NAME = "TouchControl"
@@ -50,11 +52,21 @@ DEVICE_ID = 0x14
 # Wie oft pro Sekunde MIDI abholen.
 POLL_HZ = 60
 
+# Zielaufloesung des 10.1"-Touchscreens (Querformat).
+Window.size = (1280, 800)
 
-class MixerDemoApp(App):
-    """Haupt-App: oeffnet den MIDI-Port und zeigt 8 Kanalzuege."""
+
+class MixerDemoApp(ThemedAppMixin, App):
+    """Haupt-App: oeffnet den MIDI-Port und zeigt 8 Kanalzuege.
+
+    Erbt von :class:`~touchcontrol.ui.app_mixin.ThemedAppMixin` die reaktiven
+    Theme- und DAW-Properties, die von der KV-Oberflaeche referenziert werden.
+    """
 
     def build(self):
+        # Standard-Theme setzen, bevor die Widgets gebaut werden.
+        self.set_theme(DEFAULT_THEME)
+
         # Alle Bausteine anlegen.
         self._backend = MidiBackend()
         self._decoder = McuDecoder()
@@ -68,9 +80,8 @@ class MixerDemoApp(App):
         # Regelmaessig MIDI-Nachrichten abholen (im Kivy-Hauptthread!).
         Clock.schedule_interval(self._poll_midi, 1.0 / POLL_HZ)
 
-        # Vollbild fuer den 10.1"-Touchscreen (1280x800).
-        # Auf dem Mac im Entwicklungsmodus als normales Fenster.
-        return MixerView(
+        # Komplette Oberflaeche: Mixer-/Settings-Screen + Wisch-Streifen rechts.
+        return build_root(
             mixer_state=self._mixer,
             backend=self._backend,
             encoder=self._encoder,

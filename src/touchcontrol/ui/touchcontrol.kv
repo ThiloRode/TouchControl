@@ -1,0 +1,98 @@
+# --- TouchControl: KV-Styling der modernen Kanalzug-Widgets ---
+# Diese Datei definiert die Canvas-Vektorgrafiken (U-Klammer-Kappe des Faders,
+# Panorama-Bogen) sowie die theme-reaktive Einfaerbung der Taster. Alle Farben
+# referenzieren die ListProperties aus ThemedAppMixin (app.accent_color usw.),
+# sodass ein Theme-Wechsel sofort ein GPU-Repaint ausloest.
+
+
+<ModernFader>:
+    # Offene U-Klammer-Kappe (links geschlossen, rechts offen) plus dB-Anzeige.
+    canvas:
+        # 1. Klammer-Kontur in Akzentfarbe.
+        Color:
+            rgba: app.accent_color
+        Line:
+            points:
+                [self.center_x + self.cap_w, self.cap_y + self.cap_h,
+                self.center_x - self.cap_w, self.cap_y + self.cap_h,
+                self.center_x - self.cap_w, self.cap_y - self.cap_h,
+                self.center_x + self.cap_w, self.cap_y - self.cap_h]
+            width: 4
+            cap: 'round'
+            joint: 'round'
+
+        # 2. Indikatorstrich – laeuft nur von links bis zur Mitte,
+        #    damit die dB-Anzeige rechts ueberschneidungsfrei bleibt.
+        Color:
+            rgba: 1, 1, 1, 0.9
+        Line:
+            points: [self.center_x - self.cap_w + 26, self.cap_y, self.center_x + 4, self.cap_y]
+            width: 1.0
+
+    # 3. dB-Anzeige am rechten Rand der offenen Kappe.
+    Label:
+        text: root.db_text
+        font_size: '14sp'
+        bold: True
+        color: app.accent_color
+        size_hint: None, None
+        size: 40, 18
+        center_y: root.cap_y
+        center_x: root.center_x + root.cap_w - 18
+
+
+<ModernPanner>:
+    # Runder Panorama-Regler mit Luecke unten.
+    canvas:
+        # Hintergrund des Panners.
+        Color:
+            rgba: app.widget_bg_color
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+        # Koordinatensystem um 135 Grad drehen -> Luecke bleibt stabil unten.
+        PushMatrix
+        Rotate:
+            angle: 135
+            axis: 0, 0, 1
+            origin: self.center
+
+        # A. Inaktiver Pfad (25 % Deckkraft der Sekundaerfarbe).
+        Color:
+            rgba: app.secondary_color[0], app.secondary_color[1], app.secondary_color[2], 0.25
+        Line:
+            ellipse: [self.center_x - self.radius, self.center_y - self.radius, self.radius * 2, self.radius * 2, 0, 270]
+            width: 5
+            cap: 'round'
+
+        # B. Aktiver Bogen (Akzentfarbe) zeigt die geregelte Balance.
+        Color:
+            rgba: app.accent_color
+        Line:
+            ellipse: [self.center_x - self.radius, self.center_y - self.radius, self.radius * 2, self.radius * 2, self.active_angle_start, self.active_angle_end]
+            width: 6
+            cap: 'round'
+
+        PopMatrix
+
+    # Positionsanzeige (L/C/R bzw. 1-99) mittig im Regler.
+    Label:
+        text: root.pan_text
+        font_size: '14sp'
+        bold: True
+        color: app.accent_color
+        size_hint: None, None
+        size: 80, 28
+        center: root.center
+
+
+<ChannelToggleButton>:
+    # LED-Taster: Der dauerhafte Zustand (self.active) kommt vom DAW-Feedback.
+    # Zusaetzlich gibt es eine kurzfristige Druck-Rueckmeldung (self.state ==
+    # 'down'), damit der Taster sofort reagiert, auch bevor die DAW antwortet.
+    background_normal: ''
+    background_down: ''
+    bold: True
+    background_color: app.accent_color if self.active else ([0.32, 0.32, 0.36, 1] if self.state == 'down' else [0.15, 0.15, 0.15, 1])
+    color: [1, 1, 1, 1] if (self.active or self.state == 'down') else [0.6, 0.6, 0.6, 1]

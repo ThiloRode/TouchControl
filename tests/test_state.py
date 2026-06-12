@@ -8,11 +8,9 @@ from touchcontrol.model import ChannelState, MixerState
 from touchcontrol.mcu import ButtonEvent, FaderEvent, LcdEvent, MeterEvent, VPotEvent
 from touchcontrol.mcu.constants import (
     MUTE_BASE,
-    READ,
     REC_BASE,
     SELECT_BASE,
     SOLO_BASE,
-    WRITE,
 )
 
 
@@ -271,18 +269,6 @@ def test_mixer_state_select_setzt_selected_channel():
     mixer.apply_event(ButtonEvent(note=SELECT_BASE + 5, pressed=True))
     assert mixer.channel(5).select is True
     assert mixer.selected_channel == 5
-
-
-def test_mixer_state_read_write_gilt_fuer_selektierten_kanal():
-    """Read/Write (global) landen beim aktuell selektierten Kanal."""
-    mixer = MixerState()
-    mixer.apply_event(ButtonEvent(note=SELECT_BASE + 4, pressed=True))
-    mixer.apply_event(ButtonEvent(note=READ, pressed=True))
-    mixer.apply_event(ButtonEvent(note=WRITE, pressed=True))
-    assert mixer.channel(4).read is True
-    assert mixer.channel(4).write is True
-    # Andere Kanaele bleiben unberuehrt.
-    assert mixer.channel(0).read is False
 
 
 def test_mixer_state_meter_setzt_pegel():

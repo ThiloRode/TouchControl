@@ -45,11 +45,6 @@ class ChannelState:
         self.select: bool = False
         self.rec: bool = False
 
-        # Automations-Zustaende (Read/Write). Bei MCU global, hier aber pro
-        # Kanal gespiegelt: gilt fuer den jeweils selektierten Kanal.
-        self.read: bool = False
-        self.write: bool = False
-
         # Pan-/V-Pot-Position 0.0 (ganz links) bis 1.0 (ganz rechts),
         # 0.5 = Mitte. Kommt als V-Pot-LED-Ring (CC) von der DAW.
         self.pan: float = 0.5
